@@ -8,33 +8,25 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    //! Include traits for API tokens and notification functionality
     use HasApiTokens, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    //! Define which attributes can be mass-assigned
     protected $fillable = [
-        'username',
-        'password',
-        'role',  // Include role as a fillable attribute
+        'username',  // Stores the username of the user
+        'password',  // Stores the user's password
+        'role',      // Stores the user's role (e.g., admin, visitor, etc.)
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
+    //! Define which attributes should be hidden in arrays
     protected $hidden = [
-        'password',
+        'password',  // The password field is hidden from being exposed in responses
     ];
 
-    /**
-     * Get the comments for the user.
-     */
+    //! Define a one-to-many relationship: A user can have many comments
     public function comments()
     {
         return $this->hasMany(Comment::class);
     }
 }
+

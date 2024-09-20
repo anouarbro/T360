@@ -9,8 +9,10 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       //! Set the icon theme for the AppBar
-      iconTheme: const IconThemeData(
-        color: Colors.black, // Set the icon color to black
+      iconTheme: IconThemeData(
+        color: Theme.of(context)
+            .colorScheme
+            .secondary, // Set the icon color to black
         size: 30, // Set the icon size to 30
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

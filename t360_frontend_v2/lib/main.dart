@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,6 +10,7 @@ import 'pages/ui/tablet.dart';
 import 'pages/view/login.dart';
 import 'providers/auth_provider.dart';
 import 'providers/comment_provider.dart';
+import 'providers/exportation_provider.dart';
 import 'providers/study_case_provider.dart';
 import 'providers/user_provider.dart';
 import 'services/api_service.dart';
@@ -35,8 +38,14 @@ void main() {
         //! Comment provider to manage comments using the API service
         ChangeNotifierProvider(
             create: (_) => CommentProvider(apiService: ApiService())),
+
+        //! Exportation provider to manage exportation using the API service
+        ChangeNotifierProvider(create: (_) => ExportationProvider()),
       ],
-      child: const MyApp(), //! Entry point to the application
+      child: DevicePreview(
+        enabled: !kReleaseMode,
+        builder: (context) => const MyApp(),
+      ),
     ),
   );
 }

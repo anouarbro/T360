@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 final ThemeData lightMode = ThemeData(
   colorScheme: const ColorScheme.light(
-    primary: Color.fromARGB(255, 170, 199, 214), // primary-200
+    primary: Color(0xFF0A79A7), // updated primary
     secondary: Color(0xFF00668c), // accent-200
     error: Color(0xFFB00020),
     onPrimary: Color(0xFF1d1c1c), // text-100
@@ -91,7 +91,7 @@ final ThemeData lightMode = ThemeData(
   ),
 
   buttonTheme: const ButtonThemeData(
-    buttonColor: Color(0xFFb6ccd8), // primary-200
+    buttonColor: Color(0xFF0A79A7), // updated primary
     splashColor: Color(0xFF71c4ef), // accent-100
     textTheme: ButtonTextTheme.primary,
   ),
@@ -102,7 +102,7 @@ final ThemeData lightMode = ThemeData(
         if (states.contains(WidgetState.hovered)) {
           return const Color(0xFF71c4ef); // accent-100
         }
-        return const Color(0xFFb6ccd8); // primary-200
+        return const Color(0xFF0A79A7); // updated primary
       }),
       foregroundColor: WidgetStateProperty.all<Color>(
         const Color(0xFF1d1c1c), // text-100
@@ -116,11 +116,11 @@ final ThemeData lightMode = ThemeData(
   ),
 
   iconTheme: const IconThemeData(
-    color: Color.fromARGB(255, 170, 199, 214), // accent-100
+    color: Color(0xFF0A79A7), // updated primary
   ),
 
   floatingActionButtonTheme: const FloatingActionButtonThemeData(
-    backgroundColor: Color(0xFFb6ccd8), // primary-200
+    backgroundColor: Color(0xFF0A79A7), // updated primary
     foregroundColor: Color(0xFF1d1c1c), // text-100
   ),
 );

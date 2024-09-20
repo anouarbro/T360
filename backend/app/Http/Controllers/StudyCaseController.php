@@ -9,30 +9,43 @@ use Illuminate\Support\Facades\Log;
 
 class StudyCaseController extends Controller
 {
+    /**
+     *! Get all study cases.
+     * 
+     * This method returns all study cases in a JSON response.
+     */
     public function index()
     {
         return response()->json(StudyCase::all(), 200);
     }
 
+    /**
+     *! Store a new study case.
+     * 
+     * This method validates the input, stores the file, and creates a new study case.
+     */
     public function store(Request $request)
     {
+        // Validate the input data
         $request->validate([
             'nom_etude' => 'required|string|max:255',
             'date_debut' => 'required|date',
-            'date_fin' => 'required|date|after_or_equal:date_debut',
-            'timing_attendu' => 'required|date_format:H:i:s',
-            'timing_reelle' => 'required|date_format:H:i:s',
-            'cadence_attendu' => 'required|numeric',
-            'cadence_reelle' => 'required|numeric',
-            'zipFile' => 'required|file|mimes:zip,rar,7z,gz,tar|max:10485760',
+            'date_fin' => 'required|date|after_or_equal:date_debut', // Ensure end date is after or same as start date
+            'timing_attendu' => 'required|date_format:H:i:s',        // Expected timing
+            'timing_reelle' => 'required|date_format:H:i:s',         // Actual timing
+            'cadence_attendu' => 'required|numeric',                 // Expected cadence
+            'cadence_reelle' => 'required|numeric',                  // Actual cadence
+            'zipFile' => 'required|file|mimes:zip,rar,7z,gz,tar|max:10485760', // File validation for zip format
         ]);
 
         DB::beginTransaction();
 
         try {
+            // Store the file and create the study case
             $studyCaseName = $request->nom_etude;
             $zipFilePath = $this->storeFile($request->file('zipFile'), $studyCaseName);
 
+            // Create a new study case
             $studyCase = StudyCase::create([
                 'nom_etude' => $request->nom_etude,
                 'date_debut' => $request->date_debut,
@@ -46,6 +59,7 @@ class StudyCaseController extends Controller
 
             DB::commit();
 
+            // Return the created study case in a response
             return response()->json($studyCase, 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -54,36 +68,26 @@ class StudyCaseController extends Controller
         }
     }
 
+    /**
+     *! Show a specific study case.
+     * 
+     * This method returns a single study case in a JSON response.
+     */
     public function show(StudyCase $studyCase)
     {
         return response()->json($studyCase, 200);
     }
 
-    // Update StudyCase information only
-    /* public function updateStudyCaseInfo(Request $request, StudyCase $studyCase)
-    {
-        Log::info("Received update request for StudyCase ID: {$studyCase->id}", $request->all());
-
-        $validatedData = $request->validate([
-            'nom_etude' => 'sometimes|required|string|max:255',
-            'date_debut' => 'sometimes|required|date',
-            'date_fin' => 'sometimes|required|date|after_or_equal:date_debut',
-            'timing_attendu' => 'sometimes|required|date_format:H:i:s',
-            'timing_reelle' => 'sometimes|required|date_format:H:i:s',
-            'cadence_attendu' => 'sometimes|required|numeric',
-            'cadence_reelle' => 'sometimes|required|numeric',
-        ]);
-
-        $studyCase->update($validatedData);
-
-        Log::info("Successfully updated study case information for StudyCase ID: {$studyCase->id}");
-
-        return response()->json($studyCase, 200);
-    } */
+    /**
+     *! Update the information of a study case.
+     * 
+     * This method updates the study case details and handles renaming the associated directory if needed.
+     */
     public function updateStudyCaseInfo(Request $request, StudyCase $studyCase)
     {
         Log::info("Received update request for StudyCase ID: {$studyCase->id}", $request->all());
 
+        // Validate the input data for the update
         $validatedData = $request->validate([
             'nom_etude' => 'sometimes|required|string|max:255',
             'date_debut' => 'sometimes|required|date',
@@ -94,24 +98,24 @@ class StudyCaseController extends Controller
             'cadence_reelle' => 'sometimes|required|numeric',
         ]);
 
-        // Check if the study case name is changing
+        // Check if the study case name is being updated
         if (isset($validatedData['nom_etude']) && $validatedData['nom_etude'] !== $studyCase->nom_etude) {
             Log::info("StudyCase name change detected, old: {$studyCase->nom_etude}, new: {$validatedData['nom_etude']}");
 
             $oldDirectoryPath = "study_cases_files/{$studyCase->nom_etude}";
             $newDirectoryPath = "study_cases_files/{$validatedData['nom_etude']}";
 
-            // Check if the new directory already exists
+            // Ensure the new directory name does not already exist
             if (Storage::disk('public')->exists($newDirectoryPath)) {
                 Log::error("Directory with new name already exists: {$newDirectoryPath}");
                 return response()->json(['error' => 'New directory name already exists.'], 409);
             }
 
-            // Move the old directory to the new one if it exists
+            // Move the old directory to the new one
             if (Storage::disk('public')->exists($oldDirectoryPath)) {
                 Storage::disk('public')->move($oldDirectoryPath, $newDirectoryPath);
 
-                // Update the `zipFile` path if it exists in the study case
+                // Update the `zipFile` path
                 if ($studyCase->zipFile) {
                     $validatedData['zipFile'] = str_replace($oldDirectoryPath, $newDirectoryPath, $studyCase->zipFile);
                 }
@@ -123,7 +127,7 @@ class StudyCaseController extends Controller
             }
         }
 
-        // Update the study case with validated data
+        // Update the study case with the validated data
         $studyCase->update($validatedData);
 
         Log::info("Successfully updated study case information for StudyCase ID: {$studyCase->id}");
@@ -131,24 +135,28 @@ class StudyCaseController extends Controller
         return response()->json($studyCase, 200);
     }
 
-
-    // Upload or update the file for the StudyCase
+    /**
+     *! Upload or update the zip file for the study case.
+     * 
+     * This method handles the file upload and updates the file path in the study case.
+     */
     public function uploadZipFile(Request $request, StudyCase $studyCase)
     {
         Log::info("Received file upload request for StudyCase ID: {$studyCase->id}");
 
+        // Validate the file input
         $request->validate([
-            'zipFile' => 'required|file|mimes:zip,rar,7z,gz,tar|max:10485760',  // Required file validation
+            'zipFile' => 'required|file|mimes:zip,rar,7z,gz,tar|max:10485760',  // File validation for specific formats and max size
         ]);
 
-        // Check if a file is provided
+        // Handle file upload
         if ($request->hasFile('zipFile')) {
-            // Delete old file if it exists
+            // Delete the old file if it exists
             if ($studyCase->zipFile) {
                 Storage::disk('public')->delete($studyCase->zipFile);
             }
 
-            // Store the new file
+            // Store the new file and update the study case
             $zipFilePath = $this->storeFile($request->file('zipFile'), $studyCase->nom_etude);
             $studyCase->update(['zipFile' => $zipFilePath]);
 
@@ -158,6 +166,11 @@ class StudyCaseController extends Controller
         return response()->json($studyCase, 200);
     }
 
+    /**
+     *! Store the uploaded file.
+     * 
+     * This method handles the logic for storing files in the proper directory structure.
+     */
     private function storeFile($file, $studyCaseName)
     {
         $originalName = $file->getClientOriginalName();
@@ -165,22 +178,27 @@ class StudyCaseController extends Controller
         $extension = $file->getClientOriginalExtension();
         $finalName = $fileName . '_' . time() . '.' . $extension;
 
+        // Store the file in a directory named after the study case
         return $file->storeAs("study_cases_files/{$studyCaseName}", $finalName, 'public');
     }
 
-
+    /**
+     *! Delete a study case and its associated files.
+     * 
+     * This method deletes the study case from the database and removes its files from storage.
+     */
     public function destroy(StudyCase $studyCase)
     {
         $directoryPath = "study_cases_files/{$studyCase->nom_etude}";
 
+        // Delete the directory if it exists
         if (Storage::disk('public')->exists($directoryPath)) {
             Storage::disk('public')->deleteDirectory($directoryPath);
         }
 
+        // Delete the study case from the database
         $studyCase->delete();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204); // No content response after deletion
     }
-
 }
-

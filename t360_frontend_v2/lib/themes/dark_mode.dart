@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 final ThemeData darkMode = ThemeData(
   colorScheme: const ColorScheme.dark(
-    primary: Color.fromARGB(255, 170, 199, 214), // primary-200
+    primary: Color(0xFF00668c), // Updated primary
     secondary: Color(0xFF006fff), // accent-100
-
     error: Color(0xFFB00020),
     onPrimary: Color(0xFFFFFFFF), // text-100
     onSecondary: Color(0xFFe1ffff), // accent-200
@@ -41,7 +40,7 @@ final ThemeData darkMode = ThemeData(
       fontSize: 16.0,
     ),
     bodyMedium: TextStyle(
-      color: Color(0xFF69b4ff), // primary-200
+      color: Color(0xFF00668c), // Updated primary
       fontSize: 14.0,
     ),
     displayLarge: TextStyle(
@@ -89,7 +88,7 @@ final ThemeData darkMode = ThemeData(
   ),
 
   buttonTheme: const ButtonThemeData(
-    buttonColor: Color(0xFF69b4ff), // primary-200
+    buttonColor: Color(0xFF00668c), // Updated primary
     splashColor: Color(0xFF0085ff), // primary-100
     textTheme: ButtonTextTheme.primary,
   ),
@@ -100,7 +99,7 @@ final ThemeData darkMode = ThemeData(
         if (states.contains(WidgetState.hovered)) {
           return const Color(0xFF0085ff); // primary-100
         }
-        return const Color(0xFF69b4ff); // primary-200
+        return const Color(0xFF00668c); // Updated primary
       }),
       foregroundColor: WidgetStateProperty.all<Color>(
         const Color(0xFF1E1E1E), // bg-100
@@ -114,11 +113,11 @@ final ThemeData darkMode = ThemeData(
   ),
 
   iconTheme: const IconThemeData(
-    color: Color.fromARGB(255, 170, 199, 214), // primary-200
+    color: Color(0xFF00668c), // Updated primary
   ),
 
   floatingActionButtonTheme: const FloatingActionButtonThemeData(
-    backgroundColor: Color(0xFF69b4ff), // primary-200
-    foregroundColor: Color(0xFF1E1E1E), // bg-100
+    backgroundColor: Color(0xFF00668c), // Updated primary
+    foregroundColor: Color(0xFF1E1E1E), // bg-100
   ),
 );

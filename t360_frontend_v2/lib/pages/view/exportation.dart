@@ -1,357 +1,245 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../components/my_filter.dart'; // Import the custom MyFilter widget
+import '../../components/my_filter.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/exportation_provider.dart';
 
 class Exportation extends StatefulWidget {
   const Exportation({super.key});
 
   @override
-  State<Exportation> createState() => _ExportationState();
+  _ExportationState createState() => _ExportationState();
 }
 
 class _ExportationState extends State<Exportation> {
-  List<Map<String, dynamic>> _selectedItems =
-      []; // List to hold selected filter items
+  int _lastSelectedTabIndex = 0; // Track the last selected tab index
 
-  //! Method to show the multi-select filter dialog
-  void _showMultiSelect() async {
-    final List<Map<String, dynamic>> items = [
-      {
-        "category": "Fruits",
-        "items": [
-          {
-            "name": "Apple",
-            "subItems": ["Green Apple", "Red Apple"] // Sub-items for Apple
-          },
-          {
-            "name": "Banana",
-            "subItems": [
-              "Cavendish Banana",
-              "Red Banana"
-            ] // Sub-items for Banana
-          }
-        ]
-      },
-      {
-        "category": "Vegetables",
-        "items": [
-          {
-            "name": "Carrot",
-            "subItems": [
-              "Nantes Carrot",
-              "Imperator Carrot"
-            ] // Sub-items for Carrot
-          },
-          {
-            "name": "Broccoli",
-            "subItems": [
-              "Calabrese Broccoli",
-              "Sprouting Broccoli"
-            ] // Sub-items for Broccoli
-          }
-        ]
+  @override
+  void initState() {
+    super.initState();
+    // Fetch the B2B and B2C data using the token from AuthProvider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.token; // Get the user token
+      print("Token retrieved: $token"); // Debugging log
+
+      if (token != null) {
+        Provider.of<ExportationProvider>(context, listen: false)
+            .fetchData(token)
+            .then((_) {
+          print("Data fetched successfully");
+        }).catchError((error) {
+          print("Error fetching data: $error");
+        });
+      } else {
+        // Handle case where token is null
+        print('No token available');
       }
-    ];
-
-    //! Show filter dialog and capture selected items
-    final List<List<String>>? results = await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return MyFilter(
-          items: items, // Pass filter options
-          selectedItems: _selectedItems
-              .expand((item) => item['subItems'].map((subItem) => [
-                    item['category'] as String,
-                    item['items'] as String,
-                    subItem['name'] as String
-                  ]))
-              .toList()
-              .cast<List<String>>(), // Flatten selected items list
-        );
-      },
-    );
-
-    //! Process selected items if the user made a selection
-    if (results != null && mounted) {
-      setState(() {
-        Map<String, Set<String>> groupedItems = {};
-
-        for (var item in results) {
-          String category = item[0]; // Category (e.g., Fruits, Vegetables)
-          String mainItem = item[1]; // Main item (e.g., Apple, Carrot)
-          String subItem = item[2]; // Sub-item (e.g., Green Apple)
-
-          //! Group selected items by category and main item
-          if (!groupedItems.containsKey('$category|$mainItem')) {
-            groupedItems['$category|$mainItem'] = {};
-          }
-
-          groupedItems['$category|$mainItem']!.add(subItem);
-        }
-
-        //! Update the selected items list
-        _selectedItems = groupedItems.entries.map((entry) {
-          var keys = entry.key.split('|');
-          return {
-            'category': keys[0],
-            'items': keys[1],
-            'subItems': entry.value.map((subItem) {
-              return {
-                'name': subItem,
-                'number': 1, // Default number (can be customized)
-              };
-            }).toList(),
-            'isExpanded': false,
-          };
-        }).toList();
-      });
-    }
+    });
   }
 
-  //! Main build method for the Exportation screen
   @override
   Widget build(BuildContext context) {
+    final exportationProvider = Provider.of<ExportationProvider>(context);
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor, // Set the background color
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
-          //! Filter and Export buttons
-          _buildFilterExportRow(theme),
+          // Filter and Export buttons
+          _buildFilterExportRow(theme, exportationProvider),
           Expanded(
             flex: 2,
-            //! Display message if no filter is selected
-            child: _selectedItems.isEmpty
-                ? Center(
-                    child: Text(
-                      'No filter selected',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary, // Style the text
+            child: exportationProvider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : exportationProvider.selectedItems.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No filter selected',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: ListView(
+                          children: exportationProvider.selectedItems
+                              .where((item) => _isValidItem(
+                                  item)) // Ensure valid items are displayed
+                              .map<Widget>((item) {
+                            return _buildExpansionTile(item, theme);
+                          }).toList(),
+                        ),
                       ),
-                    ),
-                  )
-                //! Display selected items if filters are applied
-                : Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ListView(
-                      children: _selectedItems.map<Widget>((item) {
-                        return _buildExpansionTile(item,
-                            theme); // Create expansion tiles for each item
-                      }).toList(),
-                    ),
-                  ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  //! Build row containing the Filter and Export buttons
-  Widget _buildFilterExportRow(ThemeData theme) {
+  // Check if the item is valid (has sufficient information)
+  bool _isValidItem(Map<String, dynamic> item) {
+    return (item['Nom_du_champ'] != null &&
+            item['Nom_du_champ'].toString().isNotEmpty) ||
+        (item['Nom'] != null && item['Nom'].toString().isNotEmpty);
+  }
+
+  Widget _buildFilterExportRow(ThemeData theme, ExportationProvider provider) {
     return Row(
       children: [
-        //! Filter button
+        // Filter button
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: GestureDetector(
-              onTap: _showMultiSelect, // Show multi-select filter dialog
+              onTap: _showMultiSelect,
               child: _buildFilterExportContainer(
                 theme,
                 'F I L T E R',
-                FluentIcons.arrow_sort_down_lines_24_filled, // Filter icon
+                Icons.filter_list,
               ),
             ),
           ),
         ),
-        //! Export button (currently only visual, no action)
+        // Export button
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: GestureDetector(
+              onTap: () {
+                // Avoid calling any build-affecting logic directly in onTap
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final exportationProvider =
+                      Provider.of<ExportationProvider>(context, listen: false);
+                  if (exportationProvider.selectedItems.isNotEmpty) {
+                    exportationProvider
+                        .exportItems(exportationProvider.selectedItems);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('No items selected to export')),
+                    );
+                  }
+                });
+              },
               child: _buildFilterExportContainer(
                 theme,
                 'E X P O R T',
-                FluentIcons.share_24_filled, // Export icon
+                Icons.share,
               ),
             ),
           ),
-        ),
+        )
       ],
     );
   }
 
-  //! Build the Filter/Export container widget (used for both buttons)
   Widget _buildFilterExportContainer(
       ThemeData theme, String title, IconData icon) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius:
-            const BorderRadius.all(Radius.circular(10)), // Rounded corners
-        color: theme.colorScheme.primary, // Primary color from theme
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        color: theme.colorScheme.primary,
       ),
-      width: double.infinity, // Full width of the container
-      height: 50, // Height of the container
+      width: double.infinity,
+      height: 50,
       child: ListTile(
         title: Text(
-          title, // Display the title ('FILTER' or 'EXPORT')
+          title,
           style: TextStyle(
-            color: theme.textTheme.labelLarge!.color, // Text color from theme
+            color: theme.textTheme.labelLarge!.color,
           ),
         ),
         trailing: Icon(
-          icon, // Display the icon (filter or export)
-          color: Theme.of(context)
-              .textTheme
-              .labelLarge
-              ?.color, // Icon color from theme
-          size: Theme.of(context)
-              .textTheme
-              .headlineMedium
-              ?.fontSize, // Icon size from theme
+          icon,
+          color: theme.textTheme.labelLarge?.color,
+          size: theme.textTheme.headlineMedium?.fontSize,
         ),
       ),
     );
   }
 
-  //! Build the expansion tile for displaying selected items
   Widget _buildExpansionTile(Map<String, dynamic> item, ThemeData theme) {
+    // Ensure item data is handled properly to avoid null errors
+    String title = item['Nom_du_champ'] ?? item['Nom'] ?? 'Unknown Item';
+
+    // Filter out empty subItems
+    List subItems = item.entries
+        .where((entry) =>
+            entry.key != 'Nom_du_champ' &&
+            entry.key != 'Nom' &&
+            entry.value != null &&
+            entry.value.toString().isNotEmpty)
+        .map((entry) => {'label': entry.key, 'value': entry.value.toString()})
+        .toList();
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10), // Bottom margin between tiles
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10), // Rounded corners for the tile
-        color:
-            Theme.of(context).listTileTheme.tileColor, // Tile color from theme
+        borderRadius: BorderRadius.circular(10),
+        color: theme.listTileTheme.tileColor,
         boxShadow: const [
           BoxShadow(
-            color: Colors.black12, // Shadow color
-            blurRadius: 4, // Blur radius for shadow
-            offset: Offset(2, 2), // Shadow offset
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(2, 2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Theme(
-          data: theme.copyWith(
-            dividerColor: Colors.transparent, // Remove divider color
-            splashColor: Colors.transparent, // Remove splash effect
-            highlightColor: Colors.transparent, // Remove highlight effect
-          ),
-          child: ExpansionTile(
-            iconColor: theme.colorScheme.onSurface, // Icon color for expansion
-            title: Text(
-              item['items'], // Display the main item (e.g., Apple, Carrot)
-              style: TextStyle(
-                fontWeight: FontWeight.bold, // Bold text
-                color: theme.colorScheme.onSurface, // Text color from theme
-              ),
+        child: ExpansionTile(
+          iconColor: theme.colorScheme.onSurface,
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
-            //! Display the sub-items inside the expansion tile
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child:
-                    _buildItemTable(item, theme), // Build table with sub-items
-              ),
-            ],
           ),
+          children: subItems.isEmpty
+              ? [
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text("No details available"),
+                  ),
+                ]
+              : subItems.map((subItem) {
+                  return ListTile(
+                    title: Text(
+                      '${subItem['label']}: ${subItem['value']}',
+                      style: TextStyle(color: theme.colorScheme.onSurface),
+                    ),
+                  );
+                }).toList(),
         ),
       ),
     );
   }
 
-  //! Build the table inside the expansion tile displaying sub-items
-  Widget _buildItemTable(Map<String, dynamic> item, ThemeData theme) {
-    return Table(
-      //! Table borders
-      border: TableBorder(
-        horizontalInside: BorderSide(
-          color: theme.textTheme.bodyLarge?.color ??
-              Colors.black, // Horizontal borders
-          width: 1,
-        ),
-        verticalInside: BorderSide(
-          color: theme.textTheme.bodyLarge?.color ??
-              Colors.black, // Vertical borders
-          width: 1,
-        ),
-        borderRadius:
-            BorderRadius.circular(10), // Rounded corners for the table
-      ),
-      columnWidths: const {
-        0: FlexColumnWidth(2), // Subitem column width
-        1: FlexColumnWidth(1), // Number column width
-        2: FlexColumnWidth(1), // Percentage column width
+  // Show filter dialog with last selected tab index
+  void _showMultiSelect() async {
+    final exportationProvider =
+        Provider.of<ExportationProvider>(context, listen: false);
+
+    final List<Map<String, dynamic>>? results = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return MyFilter(
+          b2bItems: exportationProvider.b2bItems,
+          b2cItems: exportationProvider.b2cItems,
+          selectedItems: exportationProvider.selectedItems,
+          initialTabIndex: _lastSelectedTabIndex, // Pass last selected tab
+        );
       },
-      //! Table rows (header + data rows)
-      children: [
-        //! Table header row
-        TableRow(
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .listTileTheme
-                .tileColor, // Header background color
-          ),
-          children: [
-            _buildTableCell('Subitem', theme,
-                isHeader: true), // Header cell (Subitem)
-            _buildTableCell('Number', theme,
-                isHeader: true), // Header cell (Number)
-            _buildTableCell('Percentage', theme,
-                isHeader: true), // Header cell (Percentage)
-          ],
-        ),
-        //! Table data rows
-        ...item['subItems'].map<TableRow>((subItem) {
-          return TableRow(
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .listTileTheme
-                  .tileColor, // Row background color
-            ),
-            children: [
-              _buildTableCell(subItem['name'], theme), // Subitem name
-              _buildTableCell(subItem['number'].toString(), theme), // Number
-              _buildTableCell(
-                (subItem['number'] /
-                            item['subItems']
-                                .fold(0, (sum, el) => sum + el['number']) *
-                            100)
-                        .toStringAsFixed(2) +
-                    '%', // Calculate percentage
-                theme,
-              ),
-            ],
-          );
-        }).toList(),
-      ],
     );
-  }
 
-  //! Build table cell widget
-  Widget _buildTableCell(String text, ThemeData theme,
-      {bool isHeader = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(12.0), // Padding inside the cell
-      child: Text(
-        text, // Display the cell text
-        style: TextStyle(
-          fontWeight: isHeader
-              ? FontWeight.bold
-              : FontWeight.normal, // Bold for headers
-          fontSize: isHeader ? 16 : 14, // Font size for headers and data
-          color: isHeader
-              ? theme.colorScheme.onSurfaceVariant // Header text color
-              : theme.colorScheme.onSurface, // Data text color
-        ),
-      ),
-    );
+    if (results != null && mounted) {
+      exportationProvider.updateSelectedItems(results);
+    }
   }
 }

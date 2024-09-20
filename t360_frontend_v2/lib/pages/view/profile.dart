@@ -44,11 +44,13 @@ class _ProfileState extends State<Profile> {
           _usernameController.text.trim() != currentUser.username;
       final passwordChanged = _passwordController.text.isNotEmpty;
 
-      setState(() {
-        _canSave = usernameChanged || passwordChanged;
-        _isUsernameChanged = usernameChanged;
-        _isPasswordChanged = passwordChanged;
-      });
+      if (mounted) {
+        setState(() {
+          _canSave = usernameChanged || passwordChanged;
+          _isUsernameChanged = usernameChanged;
+          _isPasswordChanged = passwordChanged;
+        });
+      }
     }
   }
 
@@ -66,6 +68,7 @@ class _ProfileState extends State<Profile> {
     //! Display different layouts based on screen size (responsive)
     return Scaffold(
       appBar: AppBar(
+        iconTheme: null,
         title: const Text('Profile Management'),
       ),
       body: LayoutBuilder(
@@ -77,6 +80,58 @@ class _ProfileState extends State<Profile> {
           }
         },
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _logout, // Call the custom logout method
+        label: const Text('Logout'),
+        icon: const Icon(Icons.logout),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  //! Logout function similar to the drawer logout logic
+  Future<void> _logout() async {
+    _showLoadingDialog(); // Show loading indicator while logging out
+
+    // Attempt to log out using AuthProvider
+    bool isSuccess =
+        await Provider.of<AuthProvider>(context, listen: false).logout();
+
+    // Dismiss loading dialog
+    Navigator.of(context).pop();
+
+    if (isSuccess) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logout success'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // Navigate to the login screen
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil('/login', (Route<dynamic> route) => false);
+    } else {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error during logout. Please try again later.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  //! Show loading dialog during logout
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
     );
   }
 
@@ -194,13 +249,17 @@ class _ProfileState extends State<Profile> {
                                 backgroundColor: Colors.green),
                           );
 
-                          await Future.delayed(const Duration(seconds: 2));
-
                           //! Log out if username or password changed
                           if (_isUsernameChanged || _isPasswordChanged) {
-                            await authProvider.logout();
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                                '/login', (Route<dynamic> route) => false);
+                            // Attempt logout
+                            await Provider.of<AuthProvider>(context,
+                                    listen: false)
+                                .logout();
+
+                            // Dismiss loading dialog
+                            if (mounted) {
+                              Navigator.pushReplacementNamed(context, '/');
+                            }
                           } else {
                             setState(() {
                               _isSaving = false;

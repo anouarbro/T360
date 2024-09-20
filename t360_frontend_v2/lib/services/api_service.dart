@@ -305,4 +305,32 @@ class ApiService {
       throw Exception('Failed to delete comment: ${response.body}');
     }
   }
+
+  //! Fetch B2B data from the backend
+  Future<List<Map<String, dynamic>>> fetchB2BData(String token) async {
+    final response = await http.get(Uri.parse('$baseUrl/b2b'),
+        headers: {'Authorization': 'Bearer $token'});
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      print('Failed to load B2B data. Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      throw Exception('Failed to load B2B data');
+    }
+  }
+
+  //! Fetch B2C data from the backend
+  Future<List<Map<String, dynamic>>> fetchB2CData(String token) async {
+    final response = await http.get(Uri.parse('$baseUrl/b2c'),
+        headers: {'Authorization': 'Bearer $token'});
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      print('Failed to load B2C data. Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+      throw Exception('Failed to load B2C data');
+    }
+  }
 }
